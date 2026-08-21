@@ -12,10 +12,8 @@ import (
 func RequestLogger(log *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-		requestID, _ := c.Get(RequestIDKey)
-		log.InfoContext(c.Request.Context(), constants.LOG_REQUEST_START,
-			"request_id", requestID, "method", c.Request.Method, "path", c.Request.URL.Path)
 		c.Next()
+		requestID := c.GetHeader("X-Request-ID")
 		log.InfoContext(c.Request.Context(), constants.LOG_REQUEST_FINISH,
 			"request_id", requestID, "method", c.Request.Method, "path", c.Request.URL.Path,
 			"status", c.Writer.Status(), "latency_ms", time.Since(start).Milliseconds())
