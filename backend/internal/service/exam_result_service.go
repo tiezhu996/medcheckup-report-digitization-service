@@ -38,9 +38,9 @@ type EnterInput struct {
 
 // Enter 录入结果并与参考值比对标红异常。
 func (s *ExamResultService) Enter(ctx context.Context, resultID, doctorID uint, input EnterInput) (*model.ExamResult, error) {
-	// 把请求上下文绑定进仓储，后续所有结果查询复用该 ctx
-	s.repo.BindCtx(ctx)
-	res, err := s.repo.FindByID(resultID)
+	// 经 WithCtx 取请求级副本，事务 tx 会继承该 ctx；共享单例不可持有请求 ctx。
+	repo := s.repo.WithCtx(ctx)
+	res, err := repo.FindByID(resultID)
 	if err != nil {
 		if errors.Is(err, util.ErrNotFound) {
 			return nil, util.NotFoundError(constants.MsgResultNotFound, err)
@@ -57,8 +57,8 @@ func (s *ExamResultService) Enter(ctx context.Context, resultID, doctorID uint, 
 	now := time.Now()
 	res.EnteredAt = &now
 	res.IsAbnormal = IsAbnormal(res.PackageItem.RefValueRange, input.ResultValue)
-	err = s.repo.Transaction(func(tx *gorm.DB) error {
-		if err := s.repo.WithTx(tx).Update(res); err != nil {
+	err = repo.Transaction(func(tx *gorm.DB) error {
+		if err := repo.WithTx(tx).Update(res); err != nil {
 			return fmt.Errorf("update exam result: %w", err)
 		}
 		if res.IsAbnormal {
@@ -85,12 +85,13 @@ func (s *ExamResultService) Enter(ctx context.Context, resultID, doctorID uint, 
 
 // Review 审核结果。
 func (s *ExamResultService) Review(ctx context.Context, resultID uint) error {
-	res, err := s.repo.FindByID(resultID)
+	repo := s.repo.WithCtx(ctx)
+	res, err := repo.FindByID(resultID)
 	if err != nil {
 		return util.NotFoundError(constants.MsgResultNotFound, err)
 	}
 	res.Status = constants.ResultReviewed
-	if err := s.repo.Update(res); err != nil {
+	if err := repo.Update(res); err != nil {
 		return util.LogError(s.log, constants.LOG_EXAM_RESULT_REVIEWED, fmt.Errorf("review result: %w", err))
 	}
 	s.log.InfoContext(ctx, constants.LOG_EXAM_RESULT_REVIEWED, "result_id", resultID)
@@ -99,12 +100,12 @@ func (s *ExamResultService) Review(ctx context.Context, resultID uint) error {
 
 // ListByRegistration 查询登记下全部结果。
 func (s *ExamResultService) ListByRegistration(ctx context.Context, regID uint) ([]model.ExamResult, error) {
-	return s.repo.ListByRegistration(regID)
+	return s.repo.WithCtx(ctx).ListByRegistration(regID)
 }
 
 // ListPending 待录入/待审核工作台。
 func (s *ExamResultService) ListPending(ctx context.Context, page, pageSize int) ([]model.ExamResult, int64, error) {
-	return s.repo.ListPending(page, pageSize)
+	return s.repo.WithCtx(ctx).ListPending(page, pageSize)
 }
 
 // IsAbnormal 数值结果与参考值范围比对（支持 "10-20" / ">10" / "<5" 等格式）。

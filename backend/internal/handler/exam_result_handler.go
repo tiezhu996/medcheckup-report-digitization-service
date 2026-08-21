@@ -30,11 +30,10 @@ func (h *ExamResultHandler) Enter(c *gin.Context) {
 		c.Error(util.BadRequest("检查结果（ExamResult）参数不合法", err))
 		return
 	}
-	// 建了带超时的 ctx，却往下传 background，超时完全不生效
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
 	h.log.InfoContext(ctx, "enter exam result", "id", id)
-	res, err := h.svc.Enter(context.Background(), id, userID(c), service.EnterInput{ResultValue: req.ResultValue, ResultText: req.ResultText, ImageURL: req.ImageURL})
+	res, err := h.svc.Enter(ctx, id, userID(c), service.EnterInput{ResultValue: req.ResultValue, ResultText: req.ResultText, ImageURL: req.ImageURL})
 	if err != nil {
 		c.Error(err)
 		return
@@ -45,7 +44,9 @@ func (h *ExamResultHandler) Enter(c *gin.Context) {
 // Review 审核结果。
 func (h *ExamResultHandler) Review(c *gin.Context) {
 	id := parseUint(c.Param("id"))
-	if err := h.svc.Review(c.Request.Context(), id); err != nil {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+	if err := h.svc.Review(ctx, id); err != nil {
 		c.Error(err)
 		return
 	}

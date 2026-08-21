@@ -10,6 +10,10 @@ import (
 )
 
 // ExamResultRepository 检查结果仓储。
+//
+// ctx 仅在构造时绑定（通过 WithCtx/WithTx），绝不在构造之后被改写：
+// 该仓储实例由服务在启动时构造一次、所有请求共享，任何请求级的 ctx 都必须经
+// WithCtx 返回新实例再使用，否则一个超时 ctx 会永久污染共享单例，后续请求全雪崩。
 type ExamResultRepository struct {
 	db  *gorm.DB
 	ctx context.Context
@@ -18,8 +22,10 @@ type ExamResultRepository struct {
 // NewExamResultRepository 构造检查结果仓储。
 func NewExamResultRepository(db *gorm.DB) *ExamResultRepository { return &ExamResultRepository{db: db} }
 
-// BindCtx 绑定基准上下文，后续所有查询复用该 ctx。
-func (r *ExamResultRepository) BindCtx(ctx context.Context) { r.ctx = ctx }
+// WithCtx 返回绑定到 ctx 的仓储副本，不修改自身。共享单例上调用安全。
+func (r *ExamResultRepository) WithCtx(ctx context.Context) *ExamResultRepository {
+	return &ExamResultRepository{db: r.db, ctx: ctx}
+}
 
 func (r *ExamResultRepository) g() *gorm.DB {
 	if r.ctx != nil {
@@ -28,7 +34,7 @@ func (r *ExamResultRepository) g() *gorm.DB {
 	return r.db
 }
 
-// WithTx 使用事务连接构造仓储。
+// WithTx 使用事务连接构造仓储，保留父级 ctx 以便事务内读取仍走请求 ctx。
 func (r *ExamResultRepository) WithTx(tx *gorm.DB) *ExamResultRepository {
 	return &ExamResultRepository{db: tx, ctx: r.ctx}
 }
