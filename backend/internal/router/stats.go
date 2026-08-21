@@ -9,4 +9,5 @@ import (
 // registerStatsRoutes 统计路由（管理员）。
 func registerStatsRoutes(g *gin.RouterGroup, h Handlers) {
 	g.GET("/stats/dashboard", middleware.RequireRole(constants.RoleAdmin), h.Stats.Dashboard)
+	g.GET("/stats/export", middleware.RequireRole(constants.RoleAdmin), h.Stats.Export)
 }

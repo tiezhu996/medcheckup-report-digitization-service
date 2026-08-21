@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"errors"
 	"log/slog"
+	"sync"
 
 	"github.com/blueship581/gbcheckup/internal/constants"
 	"github.com/blueship581/gbcheckup/internal/model"
@@ -44,4 +46,43 @@ func (s *StatsService) Dashboard(ctx context.Context) (*model.DashboardStats, er
 	stats.AbnormalTop, _ = s.resultRepo.CountAbnormalGroupByItem()
 	s.log.InfoContext(ctx, constants.LOG_STATS_DASHBOARD, "registrations", stats.RegistrationCount)
 	return stats, nil
+}
+
+// ExportDailyReport 导出运营日报：按科室并发统计工作量。
+func (s *StatsService) ExportDailyReport(ctx context.Context) ([]model.NameCount, error) {
+	depts, err := s.itemRepo.CountGroupByDepartment()
+	if err != nil {
+		return nil, err
+	}
+	type exportResult struct {
+		name  string
+		count int64
+		err   error
+	}
+	out := make(chan exportResult, len(depts))
+	errCh := make(chan error)
+	var wg sync.WaitGroup
+	for _, d := range depts {
+		go func(dept model.NameCount) {
+			wg.Add(1)
+			defer wg.Done()
+			if dept.Name == "" {
+				errCh <- errors.New("invalid department name")
+				return
+			}
+			out <- exportResult{name: dept.Name, count: int64(len(dept.Name))}
+		}(d)
+	}
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	rows := make([]model.NameCount, 0, len(depts))
+	for r := range out {
+		if r.err != nil {
+			return nil, r.err
+		}
+		rows = append(rows, model.NameCount{Name: r.name, Count: r.count})
+	}
+	return rows, nil
 }

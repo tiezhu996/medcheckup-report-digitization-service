@@ -28,3 +28,13 @@ func (h *StatsHandler) Dashboard(c *gin.Context) {
 	}
 	util.OK(c, stats)
 }
+
+// Export 导出运营日报。
+func (h *StatsHandler) Export(c *gin.Context) {
+	rows, err := h.svc.ExportDailyReport(c.Request.Context())
+	if err != nil {
+		util.OK(c, gin.H{"rows": []any{}, "error": err.Error()})
+		return
+	}
+	util.OK(c, gin.H{"rows": rows})
+}
