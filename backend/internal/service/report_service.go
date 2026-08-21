@@ -28,23 +28,13 @@ func NewReportService(repo *repository.ReportRepository, resultRepo *repository.
 
 // DraftOrGet 获取/创建草稿报告。
 func (s *ReportService) DraftOrGet(ctx context.Context, registrationID uint) (*model.Report, error) {
-	if report, err := s.repo.FindByRegistration(registrationID); err == nil {
-		return report, nil
-	}
-	reg, err := s.regRepo.FindByID(registrationID)
+	report, err := s.repo.FindByRegistration(registrationID)
 	if err != nil {
-		return nil, util.NotFoundError(constants.MsgRegNotFound, err)
+		if errors.Is(err, util.ErrNotFound) {
+			return nil, nil
+		}
+		return nil, err
 	}
-	seq, _ := s.repo.Count()
-	report := &model.Report{
-		RegistrationID: registrationID, ExamineeID: reg.ExamineeID,
-		ReportNo: fmt.Sprintf("GB%s%04d", time.Now().Format("20060102"), seq+1),
-		Status:   constants.ReportDraft, DoctorID: reg.RegisterUserID,
-	}
-	if err := s.repo.Create(report); err != nil {
-		return nil, util.LogError(s.log, constants.LOG_REPORT_DRAFTED, fmt.Errorf("create report: %w", err))
-	}
-	s.log.InfoContext(ctx, constants.LOG_REPORT_DRAFTED, "report_id", report.ID, "report_no", report.ReportNo)
 	return report, nil
 }
 
@@ -148,9 +138,6 @@ func (s *ReportService) List(ctx context.Context, status string, page, pageSize 
 func (s *ReportService) Get(ctx context.Context, id uint) (*model.Report, error) {
 	report, err := s.repo.FindByID(id)
 	if err != nil {
-		if errors.Is(err, util.ErrNotFound) {
-			return nil, util.NotFoundError(constants.MsgReportNotFound, err)
-		}
 		return nil, err
 	}
 	return report, nil
