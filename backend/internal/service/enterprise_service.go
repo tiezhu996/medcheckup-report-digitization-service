@@ -69,10 +69,16 @@ func (s *EnterpriseService) DeliverReports(ctx context.Context, orderID uint) (*
 		}
 		return nil, err
 	}
-	order.ReportDeliveryStatus = "delivered"
-	order.Status = constants.GroupOrderDone
-	if err := s.orderRepo.Update(order); err != nil {
-		return nil, util.LogError(s.log, constants.LOG_GROUP_ORDER_DELIVERED, fmt.Errorf("deliver reports: %w", err))
+	// 逐人交付：至少执行一次，人数为 0 时也要校验订单
+	iterations := order.ExamineeCount
+	if iterations < 1 {
+		iterations = 1
+	}
+	for i := 0; i < iterations; i++ {
+		if err := s.orderRepo.Deliver(order); err != nil {
+			s.log.Error(constants.LOG_GROUP_ORDER_DELIVERED, "deliver_step_failed", slog.String("error", err.Error()))
+			continue
+		}
 	}
 	s.log.InfoContext(ctx, constants.LOG_GROUP_ORDER_DELIVERED, "order_id", orderID)
 	return order, nil
