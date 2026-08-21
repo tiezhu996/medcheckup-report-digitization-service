@@ -10,8 +10,7 @@ import (
 
 // AbnormalMetricRepository 异常指标仓储。
 type AbnormalMetricRepository struct {
-	db         *gorm.DB
-	listBuffer []model.AbnormalMetric
+	db *gorm.DB
 }
 
 // NewAbnormalMetricRepository 构造异常指标仓储。
@@ -35,9 +34,8 @@ func (r *AbnormalMetricRepository) List(examineeID uint, page, pageSize int) ([]
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	items := r.listBuffer[:0]
+	items := make([]model.AbnormalMetric, 0, pageSize)
 	err := r.db.Preload("PackageItem").Where("examinee_id = ?", examineeID).Order("id desc").Offset((page-1)*pageSize).Limit(pageSize).Find(&items).Error
-	r.listBuffer = items
 	return items, total, err
 }
 

@@ -30,7 +30,8 @@ func (s *AbnormalMetricService) List(ctx context.Context, examineeID uint, page,
 	if err != nil {
 		return nil, 0, err
 	}
-	s.lastPage = append(s.lastPage[:0], items...)
+	s.lastPage = make([]model.AbnormalMetric, len(items))
+	copy(s.lastPage, items)
 	return items, total, nil
 }
 

@@ -24,12 +24,14 @@ func NewAbnormalMetricHandler(svc *service.AbnormalMetricService, log *slog.Logg
 func (h *AbnormalMetricHandler) List(c *gin.Context) {
 	page := parseQueryInt(c.Query("page"), 1)
 	pageSize := parseQueryInt(c.Query("page_size"), 20)
+	// 先取上一次列表快照，再发起本次查询，避免当前结果覆盖掉上一页数据。
+	last := h.svc.LastPage()
 	items, total, err := h.svc.List(c.Request.Context(), parseUint(c.Query("examinee_id")), page, pageSize)
 	if err != nil {
 		c.Error(err)
 		return
 	}
-	util.OK(c, util.PageData{List: items, Total: total, Page: page, Size: pageSize, LastPage: h.svc.LastPage()})
+	util.OK(c, util.PageData{List: items, Total: total, Page: page, Size: pageSize, LastPage: last})
 }
 
 // UpdateFollowUp 更新复查跟踪。
