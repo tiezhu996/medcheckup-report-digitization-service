@@ -9,14 +9,28 @@ import (
 )
 
 // PackageRepository 套餐仓储。
-type PackageRepository struct{ db *gorm.DB }
+type PackageRepository struct {
+	db    *gorm.DB
+	cache map[uint]*model.Package
+}
 
 // NewPackageRepository 构造套餐仓储。
-func NewPackageRepository(db *gorm.DB) *PackageRepository { return &PackageRepository{db: db} }
+func NewPackageRepository(db *gorm.DB) *PackageRepository {
+	return &PackageRepository{db: db, cache: map[uint]*model.Package{}}
+}
 
-func (r *PackageRepository) Create(pkg *model.Package) error { return r.db.Create(pkg).Error }
+func (r *PackageRepository) Create(pkg *model.Package) error {
+	if err := r.db.Create(pkg).Error; err != nil {
+		return err
+	}
+	r.cache[pkg.ID] = pkg
+	return nil
+}
 
 func (r *PackageRepository) FindByID(id uint) (*model.Package, error) {
+	if p, ok := r.cache[id]; ok {
+		return p, nil
+	}
 	var pkg model.Package
 	if err := r.db.First(&pkg, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -24,6 +38,7 @@ func (r *PackageRepository) FindByID(id uint) (*model.Package, error) {
 		}
 		return nil, err
 	}
+	r.cache[id] = &pkg
 	return &pkg, nil
 }
 
@@ -45,7 +60,13 @@ func (r *PackageRepository) List(status string, page, pageSize int) ([]model.Pac
 	return pkgs, total, err
 }
 
-func (r *PackageRepository) Update(pkg *model.Package) error { return r.db.Save(pkg).Error }
+func (r *PackageRepository) Update(pkg *model.Package) error {
+	if err := r.db.Save(pkg).Error; err != nil {
+		return err
+	}
+	r.cache[pkg.ID] = pkg
+	return nil
+}
 
 func (r *PackageRepository) Count() (int64, error) {
 	var count int64

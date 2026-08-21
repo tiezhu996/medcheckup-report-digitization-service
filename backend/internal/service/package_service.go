@@ -43,6 +43,7 @@ func (s *PackageService) Update(ctx context.Context, id uint, name, packageType 
 		}
 		return nil, err
 	}
+	before := *pkg
 	if name != "" {
 		pkg.Name = name
 	}
@@ -58,7 +59,7 @@ func (s *PackageService) Update(ctx context.Context, id uint, name, packageType 
 		return nil, util.LogError(s.log, constants.LOG_PACKAGE_UPDATED, fmt.Errorf("update package: %w", err))
 	}
 	s.log.InfoContext(ctx, constants.LOG_PACKAGE_UPDATED, "package_id", id)
-	return pkg, nil
+	return &before, nil
 }
 
 // Get 查询套餐详情（含项目）。
