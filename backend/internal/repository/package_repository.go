@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"sync"
 
 	"github.com/blueship581/gbcheckup/internal/model"
 	"github.com/blueship581/gbcheckup/internal/util"
@@ -9,8 +10,14 @@ import (
 )
 
 // PackageRepository 套餐仓储。
+//
+// cache 用于加速按 ID 读取，但并发 HTTP 请求会同时读写该 map，必须用 mu 保护，
+// 否则会触发 "concurrent map read and map write" 崩溃。cache 与对外返回的指针
+// 必须互相独立（store 时拷贝、read 时拷贝），避免调用方与缓存共享同一对象后
+// 被后续 Update 改动而读到半新半旧的值。
 type PackageRepository struct {
 	db    *gorm.DB
+	mu    sync.RWMutex
 	cache map[uint]*model.Package
 }
 
@@ -23,14 +30,22 @@ func (r *PackageRepository) Create(pkg *model.Package) error {
 	if err := r.db.Create(pkg).Error; err != nil {
 		return err
 	}
-	r.cache[pkg.ID] = pkg
+	cached := *pkg
+	r.mu.Lock()
+	r.cache[pkg.ID] = &cached
+	r.mu.Unlock()
 	return nil
 }
 
 func (r *PackageRepository) FindByID(id uint) (*model.Package, error) {
+	r.mu.RLock()
 	if p, ok := r.cache[id]; ok {
-		return p, nil
+		cp := *p
+		r.mu.RUnlock()
+		return &cp, nil
 	}
+	r.mu.RUnlock()
+
 	var pkg model.Package
 	if err := r.db.First(&pkg, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -38,7 +53,10 @@ func (r *PackageRepository) FindByID(id uint) (*model.Package, error) {
 		}
 		return nil, err
 	}
-	r.cache[id] = &pkg
+	cached := pkg // 缓存一份独立拷贝，与返回值互不别名
+	r.mu.Lock()
+	r.cache[id] = &cached
+	r.mu.Unlock()
 	return &pkg, nil
 }
 
@@ -64,7 +82,10 @@ func (r *PackageRepository) Update(pkg *model.Package) error {
 	if err := r.db.Save(pkg).Error; err != nil {
 		return err
 	}
-	r.cache[pkg.ID] = pkg
+	cached := *pkg
+	r.mu.Lock()
+	r.cache[pkg.ID] = &cached
+	r.mu.Unlock()
 	return nil
 }
 
