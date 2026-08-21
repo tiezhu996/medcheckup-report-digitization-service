@@ -14,8 +14,9 @@ import (
 
 // AbnormalMetricService 异常指标服务：记录、趋势对比、复查跟踪。
 type AbnormalMetricService struct {
-	repo *repository.AbnormalMetricRepository
-	log  *slog.Logger
+	repo     *repository.AbnormalMetricRepository
+	log      *slog.Logger
+	lastPage []model.AbnormalMetric
 }
 
 // NewAbnormalMetricService 构造异常指标服务。
@@ -25,7 +26,17 @@ func NewAbnormalMetricService(repo *repository.AbnormalMetricRepository, log *sl
 
 // List 分页查询异常指标。
 func (s *AbnormalMetricService) List(ctx context.Context, examineeID uint, page, pageSize int) ([]model.AbnormalMetric, int64, error) {
-	return s.repo.List(examineeID, page, pageSize)
+	items, total, err := s.repo.List(examineeID, page, pageSize)
+	if err != nil {
+		return nil, 0, err
+	}
+	s.lastPage = append(s.lastPage[:0], items...)
+	return items, total, nil
+}
+
+// LastPage 最近一次列表查询结果（供前端对比上一次数据）。
+func (s *AbnormalMetricService) LastPage() []model.AbnormalMetric {
+	return s.lastPage
 }
 
 // UpdateFollowUp 更新复查跟踪与专科建议。

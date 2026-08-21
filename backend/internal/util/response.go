@@ -18,8 +18,9 @@ func Created(c *gin.Context, data any) {
 
 // PageData 分页数据。
 type PageData struct {
-	List  any   `json:"list"`
-	Total int64 `json:"total"`
-	Page  int   `json:"page"`
-	Size  int   `json:"page_size"`
+	List     any   `json:"list"`
+	Total    int64 `json:"total"`
+	Page     int   `json:"page"`
+	Size     int   `json:"page_size"`
+	LastPage any   `json:"last_page,omitempty"`
 }

@@ -29,7 +29,7 @@ func (h *AbnormalMetricHandler) List(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	util.OK(c, util.PageData{List: items, Total: total, Page: page, Size: pageSize})
+	util.OK(c, util.PageData{List: items, Total: total, Page: page, Size: pageSize, LastPage: h.svc.LastPage()})
 }
 
 // UpdateFollowUp 更新复查跟踪。
