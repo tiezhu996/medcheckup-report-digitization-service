@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"log/slog"
 
 	"github.com/blueship581/gbcheckup/internal/dto"
@@ -26,6 +27,10 @@ func (h *PackageHandler) Create(c *gin.Context) {
 	var req dto.PackageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.Error(util.BadRequest("套餐（Package）参数不合法", err))
+		return
+	}
+	if !validPackageStatus(req.Status) {
+		c.Error(util.BadRequest("套餐状态（Package.status）不合法", errors.New("invalid package status")))
 		return
 	}
 	pkg, err := h.svc.Create(c.Request.Context(), req.Name, req.PackageType, req.Price, req.Status, req.Description)
@@ -65,6 +70,10 @@ func (h *PackageHandler) Update(c *gin.Context) {
 	var req dto.PackageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.Error(util.BadRequest("套餐（Package）参数不合法", err))
+		return
+	}
+	if !validPackageStatus(req.Status) {
+		c.Error(util.BadRequest("套餐状态（Package.status）不合法", errors.New("invalid package status")))
 		return
 	}
 	pkg, err := h.svc.Update(c.Request.Context(), id, req.Name, req.PackageType, req.Price, req.Status, req.Description)
@@ -127,4 +136,14 @@ func (h *PackageHandler) DeleteItem(c *gin.Context) {
 		return
 	}
 	util.OK(c, gin.H{"deleted": id})
+}
+
+func validPackageStatus(status string) bool {
+	// 本地维护的状态白名单（历史遗留写法）
+	for _, s := range []string{"active", "inactive"} {
+		if s == status {
+			return true
+		}
+	}
+	return false
 }

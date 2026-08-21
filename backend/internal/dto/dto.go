@@ -25,7 +25,7 @@ type PackageRequest struct {
 	Name        string  `json:"name" binding:"required,max=100"`
 	PackageType string  `json:"package_type" binding:"required,oneof=entry annual premium other"`
 	Price       float64 `json:"price" binding:"gte=0"`
-	Status      string  `json:"status" binding:"oneof=active inactive"`
+	Status      string  `json:"status"`
 	Description string  `json:"description" binding:"max=500"`
 }
 
