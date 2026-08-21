@@ -59,18 +59,20 @@ func (s *StatsService) ExportDailyReport(ctx context.Context) ([]model.NameCount
 		count int64
 		err   error
 	}
+	// 缓冲等于科室数：每个 goroutine 都能无阻塞地写入结果，
+	// 即使主循环提前 return，剩余 goroutine 仍可安全发送，关闭协程通过
+	// wg.Wait() 保证在所有发送完成后才 close(out)，杜绝 send on closed channel。
 	out := make(chan exportResult, len(depts))
-	errCh := make(chan error)
 	var wg sync.WaitGroup
 	for _, d := range depts {
+		wg.Add(1)
 		go func(dept model.NameCount) {
-			wg.Add(1)
 			defer wg.Done()
 			if dept.Name == "" {
-				errCh <- errors.New("invalid department name")
+				out <- exportResult{err: errors.New("invalid department name")}
 				return
 			}
-			out <- exportResult{name: dept.Name, count: int64(len(dept.Name))}
+			out <- exportResult{name: dept.Name, count: dept.Count}
 		}(d)
 	}
 	go func() {

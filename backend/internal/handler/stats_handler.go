@@ -33,7 +33,7 @@ func (h *StatsHandler) Dashboard(c *gin.Context) {
 func (h *StatsHandler) Export(c *gin.Context) {
 	rows, err := h.svc.ExportDailyReport(c.Request.Context())
 	if err != nil {
-		util.OK(c, gin.H{"rows": []any{}, "error": err.Error()})
+		c.Error(util.InternalError("导出运营日报（Stats）失败", err))
 		return
 	}
 	util.OK(c, gin.H{"rows": rows})
