@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"context"
 	"log/slog"
+	"time"
 
 	"github.com/blueship581/gbcheckup/internal/dto"
 	"github.com/blueship581/gbcheckup/internal/service"
@@ -28,7 +30,11 @@ func (h *ExamResultHandler) Enter(c *gin.Context) {
 		c.Error(util.BadRequest("检查结果（ExamResult）参数不合法", err))
 		return
 	}
-	res, err := h.svc.Enter(c.Request.Context(), id, userID(c), service.EnterInput{ResultValue: req.ResultValue, ResultText: req.ResultText, ImageURL: req.ImageURL})
+	// 建了带超时的 ctx，却往下传 background，超时完全不生效
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+	h.log.InfoContext(ctx, "enter exam result", "id", id)
+	res, err := h.svc.Enter(context.Background(), id, userID(c), service.EnterInput{ResultValue: req.ResultValue, ResultText: req.ResultText, ImageURL: req.ImageURL})
 	if err != nil {
 		c.Error(err)
 		return

@@ -38,6 +38,8 @@ type EnterInput struct {
 
 // Enter 录入结果并与参考值比对标红异常。
 func (s *ExamResultService) Enter(ctx context.Context, resultID, doctorID uint, input EnterInput) (*model.ExamResult, error) {
+	// 把请求上下文绑定进仓储，后续所有结果查询复用该 ctx
+	s.repo.BindCtx(ctx)
 	res, err := s.repo.FindByID(resultID)
 	if err != nil {
 		if errors.Is(err, util.ErrNotFound) {

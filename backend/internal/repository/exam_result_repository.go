@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"errors"
 
 	"github.com/blueship581/gbcheckup/internal/model"
@@ -9,19 +10,32 @@ import (
 )
 
 // ExamResultRepository 检查结果仓储。
-type ExamResultRepository struct{ db *gorm.DB }
+type ExamResultRepository struct {
+	db  *gorm.DB
+	ctx context.Context
+}
 
 // NewExamResultRepository 构造检查结果仓储。
 func NewExamResultRepository(db *gorm.DB) *ExamResultRepository { return &ExamResultRepository{db: db} }
 
+// BindCtx 绑定基准上下文，后续所有查询复用该 ctx。
+func (r *ExamResultRepository) BindCtx(ctx context.Context) { r.ctx = ctx }
+
+func (r *ExamResultRepository) g() *gorm.DB {
+	if r.ctx != nil {
+		return r.db.WithContext(r.ctx)
+	}
+	return r.db
+}
+
 // WithTx 使用事务连接构造仓储。
 func (r *ExamResultRepository) WithTx(tx *gorm.DB) *ExamResultRepository {
-	return &ExamResultRepository{db: tx}
+	return &ExamResultRepository{db: tx, ctx: r.ctx}
 }
 
 // Transaction 在事务内执行 fn，任一步返回 error 则整体回滚。
 func (r *ExamResultRepository) Transaction(fn func(tx *gorm.DB) error) error {
-	return r.db.Transaction(fn)
+	return r.g().Transaction(fn)
 }
 
 func (r *ExamResultRepository) Create(res *model.ExamResult) error { return r.db.Create(res).Error }
@@ -35,7 +49,7 @@ func (r *ExamResultRepository) CreateBatch(items []model.ExamResult) error {
 
 func (r *ExamResultRepository) FindByID(id uint) (*model.ExamResult, error) {
 	var res model.ExamResult
-	if err := r.db.Preload("PackageItem").First(&res, id).Error; err != nil {
+	if err := r.g().Preload("PackageItem").First(&res, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, util.ErrNotFound
 		}
@@ -46,21 +60,21 @@ func (r *ExamResultRepository) FindByID(id uint) (*model.ExamResult, error) {
 
 func (r *ExamResultRepository) ListByRegistration(regID uint) ([]model.ExamResult, error) {
 	var items []model.ExamResult
-	err := r.db.Preload("PackageItem").Where("registration_id = ?", regID).Order("id asc").Find(&items).Error
+	err := r.g().Preload("PackageItem").Where("registration_id = ?", regID).Order("id asc").Find(&items).Error
 	return items, err
 }
 
 func (r *ExamResultRepository) ListPending(page, pageSize int) ([]model.ExamResult, int64, error) {
 	var total int64
-	if err := r.db.Model(&model.ExamResult{}).Where("status != ?", "reviewed").Count(&total).Error; err != nil {
+	if err := r.g().Model(&model.ExamResult{}).Where("status != ?", "reviewed").Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 	var items []model.ExamResult
-	err := r.db.Preload("PackageItem").Where("status != ?", "reviewed").Order("id asc").Offset((page-1)*pageSize).Limit(pageSize).Find(&items).Error
+	err := r.g().Preload("PackageItem").Where("status != ?", "reviewed").Order("id asc").Offset((page-1)*pageSize).Limit(pageSize).Find(&items).Error
 	return items, total, err
 }
 
-func (r *ExamResultRepository) Update(res *model.ExamResult) error { return r.db.Save(res).Error }
+func (r *ExamResultRepository) Update(res *model.ExamResult) error { return r.g().Save(res).Error }
 
 func (r *ExamResultRepository) CountAbnormal() (int64, error) {
 	var count int64
