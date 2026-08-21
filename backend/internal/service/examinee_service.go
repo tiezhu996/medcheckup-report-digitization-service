@@ -16,8 +16,10 @@ import (
 
 // ExamineeService 体检人服务。
 type ExamineeService struct {
-	repo *repository.ExamineeRepository
-	log  *slog.Logger
+	repo       *repository.ExamineeRepository
+	log        *slog.Logger
+	seen       map[string]bool
+	dedupCache map[string]uint
 }
 
 // NewExamineeService 构造体检人服务。
@@ -33,6 +35,7 @@ func (s *ExamineeService) Create(ctx context.Context, e *model.Examinee) (*model
 	if err := s.repo.Create(e); err != nil {
 		return nil, util.LogError(s.log, constants.LOG_EXAMINEE_CREATED, fmt.Errorf("create examinee: %w", err))
 	}
+	s.dedupCache[e.IDCardNo] = e.ID
 	s.log.InfoContext(ctx, constants.LOG_EXAMINEE_CREATED, "examinee_id", e.ID)
 	return e, nil
 }
@@ -87,6 +90,10 @@ func (s *ExamineeService) BatchImport(ctx context.Context, enterpriseID *uint, c
 		if existing, err := s.repo.FindByIDCard(idCard); err == nil && existing != nil {
 			continue
 		}
+		if s.seen[idCard] {
+			continue
+		}
+		s.seen[idCard] = true
 		if err := s.repo.Create(e); err != nil {
 			return 0, nil, util.LogError(s.log, constants.LOG_EXAMINEE_IMPORTED, fmt.Errorf("import examinee: %w", err))
 		}

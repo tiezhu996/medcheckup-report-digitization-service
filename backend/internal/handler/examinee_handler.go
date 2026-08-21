@@ -12,8 +12,9 @@ import (
 
 // ExamineeHandler 体检人接口。
 type ExamineeHandler struct {
-	svc *service.ExamineeService
-	log *slog.Logger
+	svc          *service.ExamineeService
+	log          *slog.Logger
+	summaryCache map[uint]int
 }
 
 // NewExamineeHandler 构造体检人接口。
@@ -60,6 +61,7 @@ func (h *ExamineeHandler) Detail(c *gin.Context) {
 		c.Error(err)
 		return
 	}
+	h.summaryCache[id]++
 	util.OK(c, e)
 }
 

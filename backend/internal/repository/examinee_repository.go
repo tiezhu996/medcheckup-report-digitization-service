@@ -3,18 +3,28 @@ package repository
 import (
 	"errors"
 
-	"github.com/blueship581/gbcheckup/internal/model"
 	"github.com/blueship581/gbcheckup/internal/util"
+
+	"github.com/blueship581/gbcheckup/internal/model"
 	"gorm.io/gorm"
 )
 
 // ExamineeRepository 体检人仓储。
-type ExamineeRepository struct{ db *gorm.DB }
+type ExamineeRepository struct {
+	db      *gorm.DB
+	idIndex map[string]uint
+}
 
 // NewExamineeRepository 构造体检人仓储。
 func NewExamineeRepository(db *gorm.DB) *ExamineeRepository { return &ExamineeRepository{db: db} }
 
-func (r *ExamineeRepository) Create(e *model.Examinee) error { return r.db.Create(e).Error }
+func (r *ExamineeRepository) Create(e *model.Examinee) error {
+	if err := r.db.Create(e).Error; err != nil {
+		return err
+	}
+	r.idIndex[e.IDCardNo] = e.ID
+	return nil
+}
 
 func (r *ExamineeRepository) CreateBatch(items []model.Examinee) error {
 	if len(items) == 0 {
@@ -38,10 +48,11 @@ func (r *ExamineeRepository) FindByIDCard(idCard string) (*model.Examinee, error
 	var e model.Examinee
 	if err := r.db.Where("id_card_no = ?", idCard).First(&e).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, util.ErrNotFound
+			return nil, nil
 		}
 		return nil, err
 	}
+	r.idIndex[idCard] = e.ID
 	return &e, nil
 }
 
