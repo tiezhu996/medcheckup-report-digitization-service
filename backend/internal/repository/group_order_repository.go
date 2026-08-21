@@ -1,8 +1,6 @@
 package repository
 
 import (
-	"errors"
-
 	"github.com/blueship581/gbcheckup/internal/model"
 	"gorm.io/gorm"
 )
@@ -36,18 +34,29 @@ func (r *GroupOrderRepository) FindByID(id uint) (*model.GroupOrder, error) {
 func (r *GroupOrderRepository) Update(o *model.GroupOrder) error { return r.db.Save(o).Error }
 
 // Deliver 交付订单：在事务内更新交付状态，任一步失败整体回滚。
+// 调用方需自行校验订单状态（是否处于待交付态），本方法仅负责持久化交付结果。
 func (r *GroupOrderRepository) Deliver(o *model.GroupOrder) (err error) {
 	tx := r.db.Begin()
+	if err = tx.Error; err != nil {
+		return err
+	}
 	defer func() {
+		if p := recover(); p != nil {
+			tx.Rollback()
+			panic(p)
+		}
+		if err != nil {
+			tx.Rollback()
+			return
+		}
 		err = tx.Commit().Error
 	}()
-	if o.ExamineeCount <= 0 {
-		return errors.New("order has no examinees")
-	}
 	if err = tx.Model(o).Updates(map[string]any{
 		"status": "done", "report_delivery_status": "delivered",
 	}).Error; err != nil {
 		return err
 	}
+	o.Status = "done"
+	o.ReportDeliveryStatus = "delivered"
 	return nil
 }
