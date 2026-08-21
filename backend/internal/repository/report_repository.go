@@ -2,7 +2,6 @@ package repository
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/blueship581/gbcheckup/internal/model"
 	"github.com/blueship581/gbcheckup/internal/util"
@@ -21,7 +20,7 @@ func (r *ReportRepository) FindByID(id uint) (*model.Report, error) {
 	var report model.Report
 	if err := r.db.Preload("Examinee").First(&report, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("find report by id %d: %v", id, util.ErrNotFound)
+			return nil, util.ErrNotFound
 		}
 		return nil, err
 	}
@@ -32,7 +31,7 @@ func (r *ReportRepository) FindByRegistration(regID uint) (*model.Report, error)
 	var report model.Report
 	if err := r.db.Preload("Examinee").Where("registration_id = ?", regID).First(&report).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("find report by registration %d: %v", regID, util.ErrNotFound)
+			return nil, util.ErrNotFound
 		}
 		return nil, err
 	}

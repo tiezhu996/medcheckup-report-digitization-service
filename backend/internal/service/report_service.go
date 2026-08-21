@@ -28,13 +28,36 @@ func NewReportService(repo *repository.ReportRepository, resultRepo *repository.
 
 // DraftOrGet 获取/创建草稿报告。
 func (s *ReportService) DraftOrGet(ctx context.Context, registrationID uint) (*model.Report, error) {
-	report, err := s.repo.FindByRegistration(registrationID)
+	// 校验登记存在，缺失则返回 404。
+	reg, err := s.regRepo.FindByID(registrationID)
 	if err != nil {
 		if errors.Is(err, util.ErrNotFound) {
-			return nil, nil
+			return nil, util.NotFoundError(constants.MsgRegNotFound, err)
 		}
 		return nil, err
 	}
+	// 已存在则直接返回，保持幂等。
+	report, err := s.repo.FindByRegistration(registrationID)
+	if err == nil {
+		return report, nil
+	}
+	if !errors.Is(err, util.ErrNotFound) {
+		return nil, err
+	}
+	// 首次生成草稿：报告编号按当日序号生成，登记即关联体检人。
+	seq, _ := s.repo.Count()
+	report = &model.Report{
+		RegistrationID: registrationID,
+		ExamineeID:     reg.ExamineeID,
+		ReportNo:       fmt.Sprintf("RPT%s%04d", time.Now().Format("20060102"), seq+1),
+		Status:         constants.ReportDraft,
+	}
+	if err := s.repo.Create(report); err != nil {
+		return nil, util.LogError(s.log, constants.LOG_REPORT_DRAFTED, fmt.Errorf("create draft report: %w", err))
+	}
+	// 回填预加载的体检人，供接口直接返回。
+	report.Examinee = reg.Examinee
+	s.log.InfoContext(ctx, constants.LOG_REPORT_DRAFTED, "report_id", report.ID, "registration_id", registrationID)
 	return report, nil
 }
 
@@ -138,6 +161,9 @@ func (s *ReportService) List(ctx context.Context, status string, page, pageSize 
 func (s *ReportService) Get(ctx context.Context, id uint) (*model.Report, error) {
 	report, err := s.repo.FindByID(id)
 	if err != nil {
+		if errors.Is(err, util.ErrNotFound) {
+			return nil, util.NotFoundError(constants.MsgReportNotFound, err)
+		}
 		return nil, err
 	}
 	return report, nil
