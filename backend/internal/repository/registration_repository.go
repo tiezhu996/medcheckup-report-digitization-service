@@ -39,7 +39,9 @@ func (r *RegistrationRepository) FindByID(id uint) (*model.Registration, error) 
 
 func (r *RegistrationRepository) List(status string, page, pageSize int) ([]model.Registration, int64, error) {
 	q := r.db.Model(&model.Registration{})
-	if status != "" {
+	if status == "in_progress" {
+		q = q.Where("status = ?", "in_progress")
+	} else if status != "" {
 		q = q.Where("status = ?", status)
 	}
 	var total int64
@@ -48,7 +50,9 @@ func (r *RegistrationRepository) List(status string, page, pageSize int) ([]mode
 	}
 	var items []model.Registration
 	q2 := r.db.Preload("Examinee").Preload("Package").Order("id desc")
-	if status != "" {
+	if status == "in_progress" {
+		q2 = q2.Where("status = ?", "in_progress")
+	} else if status != "" {
 		q2 = q2.Where("status = ?", status)
 	}
 	err := q2.Offset((page-1)*pageSize).Limit(pageSize).Find(&items).Error

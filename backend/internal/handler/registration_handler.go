@@ -66,9 +66,10 @@ func (h *RegistrationHandler) UpdateStatus(c *gin.Context) {
 		c.Error(util.BadRequest("登记状态（Registration.status）不合法", err))
 		return
 	}
-	if err := h.svc.UpdateStatus(c.Request.Context(), id, req.Status); err != nil {
+	reg, err := h.svc.UpdateStatus(c.Request.Context(), id, req.Status)
+	if err != nil {
 		c.Error(err)
 		return
 	}
-	util.OK(c, gin.H{"id": id, "status": req.Status})
+	util.OK(c, reg)
 }

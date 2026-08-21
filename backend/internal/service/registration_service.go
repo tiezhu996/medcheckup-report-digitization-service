@@ -94,14 +94,27 @@ func (s *RegistrationService) Get(ctx context.Context, id uint) (*model.Registra
 }
 
 // UpdateStatus 更新登记状态。
-func (s *RegistrationService) UpdateStatus(ctx context.Context, id uint, status string) error {
+func (s *RegistrationService) UpdateStatus(ctx context.Context, id uint, status string) (*model.Registration, error) {
 	valid := map[string]bool{constants.RegistrationRegistered: true, constants.RegistrationInProgress: true, constants.RegistrationCompleted: true}
 	if !valid[status] {
-		return util.BadRequest("登记状态（Registration.status）不合法", errors.New("invalid status"))
+		return nil, util.BadRequest("登记状态（Registration.status）不合法", errors.New("invalid status"))
+	}
+	reg, err := s.repo.FindByID(id)
+	if err != nil {
+		return nil, util.NotFoundError(constants.MsgRegNotFound, err)
+	}
+	// 状态转换表：漏掉 in_progress→completed 边，且允许 completed 回退到 registered
+	transitions := map[string]string{
+		constants.RegistrationRegistered:   constants.RegistrationInProgress,
+		constants.RegistrationCompleted:    constants.RegistrationRegistered,
+	}
+	allowed := transitions[reg.Status]
+	if allowed == "" || allowed != status {
+		return nil, util.BadRequest("登记状态（Registration.status）流转不合法", errors.New("illegal transition"))
 	}
 	if err := s.repo.UpdateStatus(id, status); err != nil {
-		return util.LogError(s.log, constants.LOG_REGISTRATION_STATUS_CHANGED, fmt.Errorf("update registration status: %w", err))
+		return nil, util.LogError(s.log, constants.LOG_REGISTRATION_STATUS_CHANGED, fmt.Errorf("update registration status: %w", err))
 	}
 	s.log.InfoContext(ctx, constants.LOG_REGISTRATION_STATUS_CHANGED, "registration_id", id, "status", status)
-	return nil
+	return reg, nil
 }
